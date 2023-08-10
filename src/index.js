@@ -11,6 +11,8 @@ const rating = document.querySelector("#rating-display")
 const comment = document.querySelector("#comment-display")
 const editRamenForm = document.querySelector("#edit-ramen")
 
+let curRamen = {}
+
 //#Functions
 //##Creates new ramens and appends them to page
 function createRamen(ramenObj) {
@@ -28,8 +30,9 @@ function createRamen(ramenObj) {
 
   image.addEventListener("click", (e) => changeDisplay(ramenObj));
 
-  //Deletes ramen from the page
+  //Deletes ramen 
   deleteBtn.addEventListener("click", (e) => {
+    //clears ramen from display-div if it is there on delete is clicked
     if(ramenName.textContent === ramenObj.name){
         ramenImage.src = ""
         ramenName.textContent = ""
@@ -38,15 +41,17 @@ function createRamen(ramenObj) {
         comment.textContent = ""
     }
 
+    //Deletes ramen from data base
     fetch(`${url}/${ramenObj.id}`, {
         method: "DELETE"
     })
     .then(res => res.json())
     .then(data => {
+        //pessimistic rendering: removes image and deletebtn from DOM
         image.remove()
         deleteBtn.remove()
     })
-    .catch(err => alert("Something went wrong! The ramen wasnot deleted. Please try again later."))
+    .catch(err => alert("Something went wrong! The ramen was not deleted. Please try again later."))
   })
 }
 
@@ -57,9 +62,10 @@ function changeDisplay(ramenObj){
     resturantName.textContent = ramenObj.restaurant;
     rating.textContent = ramenObj.rating
     comment.textContent = ramenObj.comment
+    curRamen = ramenObj
 }
 
-//# Initial data fetch GET
+//Initial data fetch GET
 fetch(url)
   .then((res) => res.json())
   .then((data) => {
@@ -80,6 +86,7 @@ newRamenForm.addEventListener("submit", (e) => {
     comment: e.target["new-comment"].value
   }
 
+  //Adds new ramen to data base
   fetch(url, {
     method: "POST",
     headers: {
@@ -89,7 +96,17 @@ newRamenForm.addEventListener("submit", (e) => {
     body: JSON.stringify(newRamen)
   })
   .then(res => res.json())
-  .then(data => createRamen(data))
+  .then(data => {
+    createRamen(data)
+
+    //Clears out form after submit
+    e.target.name.value = ""
+    e.target.restaurant.value = ""
+    e.target.image.value = ""
+    e.target.rating.value = ""
+    e.target["new-comment"].value = ""
+
+  })
   .catch(err => alert("Your ramen did not save! Please try again later."))
 
 });
@@ -97,7 +114,42 @@ newRamenForm.addEventListener("submit", (e) => {
 //Edits currently displayed ramen on form submit
 editRamenForm.addEventListener("submit", (e) => {
     e.preventDefault()
-    
-    rating.textContent = e.target.rating.value
-    comment.textContent = e.target["new-comment"].value
+
+    let ratingValue
+    let commentValue
+
+    if(e.target.rating.value === ""){
+        ratingValue = rating.textContent
+    } else{
+        ratingValue = e.target.rating.value
+    }
+
+    if(e.target["new-comment"].value === ""){
+        commentValue = comment.textContent
+    } else{
+        commentValue = e.target["new-comment"].value
+    }
+
+    //updates ramen in data base
+    fetch(`${url}/${curRamen.id}`, {
+        method: "PATCH",
+        headers: {
+            "content-type" : "application/json",
+            "accept" : "application/json"
+        },
+        body: JSON.stringify({rating: ratingValue, comment: commentValue})
+    })
+    .then(res => res.json())
+    .then(data => {
+        //updates display-div
+        rating.textContent = data.rating
+        comment.textContent = data.comment
+        //updates curRamen to avoid stale closure
+        curRamen.rating = data.rating
+        curRamen.comment = data.comment
+        //clears out edit form after submit
+        e.target.rating.value = ""
+        e.target["new-comment"].value = ""
+    })
+    .catch(err => alert("Something went wrong! The ramen was not updated. Please try again later."))
 })
